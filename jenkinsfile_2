@@ -7,10 +7,12 @@
         stages {
           stage("SonarQube analysis") {
             steps {
-              withSonarQubeEnv('SonarQube') {
-                sh 'sonar:sonar -Dsonar.projectKey=SonarQubeTest2'
+              script {
+                def scannerHome = tool 'SonarQubeScaner'
+                withSonarQubeEnv('SonarQube') {
+                  sh "${scannerHome}/bin/sonar-scanner sonar:sonar -Dsonar.projectKey=SonarQubeTest2"
+                }
               }
-            }
           }
           stage("Quality Gate") {
             steps {
