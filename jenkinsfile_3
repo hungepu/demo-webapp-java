@@ -5,7 +5,7 @@
           maven 'maven-3.6.1'
         }
         environment {
-        NEXUS_VERSION = "nexus3"
+        NEXUS_VERSION = "nexus2"
         NEXUS_PROTOCOL = "http"
         NEXUS_URL = "rdrepo.vnpt-technology.vn"
         NEXUS_REPOSITORY = "VHHT_TEST"
