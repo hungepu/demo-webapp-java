@@ -1,0 +1,79 @@
+ pipeline {
+        agent any
+        tools {
+          jdk 'JDK11'
+          maven 'maven-3.6.1'
+        }
+        environment {
+        NEXUS_VERSION = "nexus3"
+        NEXUS_PROTOCOL = "http"
+        NEXUS_URL = "rdrepo.vnpt-technology.vn"
+        NEXUS_REPOSITORY = "VHHT_TEST"
+        NEXUS_CREDENTIAL_ID = "rdrepo"
+        }
+        stages {
+          stage("SonarQube analysis") {
+            steps {
+              script {
+                def scannerHome = tool 'SonarQubeScaner'
+                withSonarQubeEnv('SonarQube') {
+                  sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=SonarQubeTest2"
+                }
+              }
+           } 
+         }
+          stage("Quality Gate") {
+            steps {
+              script {
+                def qualityGateStatus = waitForQualityGate()
+                if (qualityGateStatus.status != 'OK') {
+                  error "Quality Gate failed: ${qualityGateStatus.status}"
+                }
+              }
+            }
+          }
+          stage("build") {
+            agent any
+            steps {
+              withSonarQubeEnv('SonarQube') {
+                sh 'mvn clean install -DskipTests'
+              }
+            }
+          }
+          stage("Publish to Nexus Repository Manager") {
+            steps {
+                script {
+                    pom = readMavenPom file: "pom.xml";
+                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}");
+                    echo "${filesByGlob[0].name} ${filesByGlob[0].path} ${filesByGlob[0].directory} ${filesByGlob[0].length} ${filesByGlob[0].lastModified}"
+                    artifactPath = filesByGlob[0].path;
+                    artifactExists = fileExists artifactPath;
+                    if(artifactExists) {
+                        echo "*** File: ${artifactPath}, group: ${pom.groupId}, packaging: ${pom.packaging}, version ${pom.version}";
+                        nexusArtifactUploader(
+                            nexusVersion: NEXUS_VERSION,
+                            protocol: NEXUS_PROTOCOL,
+                            nexusUrl: NEXUS_URL,
+                            groupId: pom.groupId,
+                            version: pom.version,
+                            repository: NEXUS_REPOSITORY,
+                            credentialsId: NEXUS_CREDENTIAL_ID,
+                            artifacts: [
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: artifactPath,
+                                type: pom.packaging],
+                                [artifactId: pom.artifactId,
+                                classifier: '',
+                                file: "pom.xml",
+                                type: "pom"]
+                            ]
+                        );
+                    } else {
+                        error "*** File: ${artifactPath}, could not be found";
+                    }
+                }
+            }
+        }
+        }
+      }
